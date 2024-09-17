@@ -1,0 +1,159 @@
+---
+title: "Homework4"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: inline
+---
+
+## Task 1: Conceptual Questions
+
+1.  If your working directory is myfolder/homework/, what relative path would you specify to get the file located at myfolder/MyData.csv?
+
+> "../MyData.csv"
+
+2.  What are the major benefits of using R projects?
+
+> An R project sets up and uses a directory structure that makes it easy to reference files relatively, as well as generate PDFs and html files, and rendering .qmd files.
+
+3.  What is git and what is github?
+
+> Git is a software package that provides version control for confined repositories. Github is a user-friendly way to access git capabilities, since it provides a nice user interface with which to utilize git version control.
+
+4.  What are the two main differences between a tibble and a data.frame?
+
+> First, a tibble has a prettier printing method, so it is displayed nicely when printed. Second, when a column of a tibble is selected using brackets and indices (e.g. tibble[rows, cols]), the returned object is a tibble rather than a vector.
+
+5.  Rewrite the following nested function call using BaseR’s chaining operator: arrange(filter(select(as_tibble(iris), starts_with("Petal"), Species), Petal.Length \< 1.55), Species)
+
+>| iris |>
+ |      as_tibble() |>
+ |      select(starts_with("Petal"), Species) |>
+ |      filter(Petal.Length \< 1.55) |>
+ |      arrange(Species)
+
+
+## Task 2: Reading Delimited Data
+
+### Glass Data
+
+Read data from URL (data is comma delimited):
+
+```{r}
+library(readr)
+
+glass_data <- read_csv("https://www4.stat.ncsu.edu/~online/datasets/glass.data", 
+                       col_names=c("Id", "RI", "Na", "Mg", "Al", "Si", "K", "Ca", "Ba", "Fe", "Type of Glass"))
+
+glass_data
+```
+
+Overwrite "Type_of_glass" column values and filter data:
+
+```{r, warning=FALSE,message=FALSE}
+library(dplyr)
+
+glass_data <- glass_data |>
+  mutate(`Type of Glass` = case_when(
+    `Type of Glass` == 1 ~ 'building_windows_float_processed',
+    `Type of Glass` == 2 ~ 'building_windows_non_float_processed',
+    `Type of Glass` == 3 ~ 'vehicle_windows_float_processed',
+    `Type of Glass` == 4 ~ 'vehicle_windows_non_float_processed',
+    `Type of Glass` == 5 ~ 'containers',
+    `Type of Glass` == 6 ~ 'tableware',
+    `Type of Glass` == 7 ~ 'headlamps'
+  )) |>
+  filter(Fe < 0.2 & (`Type of Glass` %in% c('tableware', 'headlamps') ))
+
+glass_data
+```
+
+### Yeast Data
+
+Read data from URL (data is fixed width):
+
+```{r}
+yeast_data <- read_fwf("https://www4.stat.ncsu.edu/~online/datasets/yeast.data",
+                       fwf_widths(c(12, 6, 6, 6, 6, 6, 6, 6, 6, 3),
+                          c("seq_name", "mcg", "gvh", "alm", "mit", "erl", "pox", "vac", "nuc", "class")
+                       )
+)
+yeast_data
+```
+
+Remove seq_name and nuc columns, add new columns:
+
+```{r}
+yeast_data |>
+  select(-c(seq_name, nuc)) |>
+  group_by(class) |>
+  mutate(across(where(is.numeric), list(mean=mean, median=median), .names="{.col}_{.fn}"))
+```
+
+## Task 3: Combining Excel and Delimited Data
+
+Import white wine data:
+
+```{r}
+library(readxl)
+white_wine <- readxl::read_excel("white-wine.xlsx")
+
+white_wine
+```
+
+Rename columns:
+
+```{r}
+white_wine_ancil <- readxl::read_excel("white-wine.xlsx",
+                                       sheet = excel_sheets("white-wine.xlsx")[2])
+
+names <- pull(white_wine_ancil, 1)
+
+names
+
+names(white_wine) <- names
+
+white_wine
+
+```
+
+Add type column:
+```{r}
+white_wine <- white_wine |>
+                mutate(type="white")
+
+white_wine
+```
+
+Import red wine data, replace column names, create type column:
+
+```{r}
+red_wine <- readr::read_delim("https://www4.stat.ncsu.edu/~online/datasets/red-wine.csv", delim = ";")
+
+red_wine
+
+names(red_wine) <- names
+
+red_wine <- red_wine |>
+                mutate(type="red")
+
+red_wine
+```
+
+Combine datasets:
+```{r}
+wine_data <- dplyr::bind_rows(white_wine, red_wine)
+
+wine_data
+```
+
+Filter, sort, and change the columns of the data:
+
+```{r}
+wine_data |>
+  filter(quality>6.5 & alcohol<132) |>
+  arrange(desc(quality)) |>
+  select(contains("acid"), alcohol, type, quality) |>
+  group_by(quality) |>
+  mutate(alcohol_mean=mean(alcohol), alcohol_sd=sd(alcohol))
+```
